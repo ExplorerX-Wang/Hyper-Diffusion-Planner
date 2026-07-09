@@ -46,8 +46,7 @@ def diffusion_loss_func(
     }
 
     _, decoder_output = model(merged_inputs) # [B, T, 4]
-    score = decoder_output["score"] # [B, T, 4]
-
+    model_pred = decoder_output["score"] # [B, T, 4]
     
     ##########################################################################
     # Transformation of model prediction and loss space
@@ -55,7 +54,7 @@ def diffusion_loss_func(
     ##########################################################################
     supervision_type = supervision_type if supervision_type is not None else model_type
     pred_pattern = f"{model_type}->{supervision_type}"
-    score = sde.transform(pred_pattern, score, t, xT)
+    score = sde.transform(pred_pattern, model_pred, t, xT)
 
     if supervision_type == "score":
         dpm_loss = torch.sum((score * std + z)**2, dim=-1) # to avoid exploding variance
@@ -71,7 +70,7 @@ def diffusion_loss_func(
     #                              Hybrid Loss                               #
     # Integration performed in \tau_0 space
     ##########################################################################
-    pred_v = sde.transform(f"{model_type}->x_start", score, t, xT)
+    pred_v = sde.transform(f"{model_type}->x_start", model_pred, t, xT)
     pred_v = norm.inverse(pred_v)
     pred_x = detached_integral(pred_v[..., :2], detach_window_size=10)
     loss["ego_planning_hybrid_loss"] = torch.sum((pred_x - ego_future[..., :2])**2, dim=-1).mean()
