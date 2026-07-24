@@ -49,6 +49,6 @@ shift || true
     train_test_split="${SPLIT}" \
     cache_path="${CACHE_PATH}" \
     force_cache_computation=true \
-    agent.config.pretrain_config.checkpoint_path="${CHECKPOINT_PATH}" \
+    +agent.config.pretrain_config.checkpoint_path="${CHECKPOINT_PATH}" \
     +cache_data_list_path="${CACHE_DATA_LIST_PATH}" \
     "$@"
