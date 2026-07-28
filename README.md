@@ -273,7 +273,17 @@ merge：
 
 **相比于IL evaluation ，score有提升0\.01**
 
+## 8. Visualization
+新建了可视化脚本，在navtest中随机抽一些场景，模型推理，绘图
+```
+cd /home/wangjunbo/Hyper-Diffusion-Planner/HDP-navsim/scripts/visualization
 
+bash ./viz.sh
+```
+
+![RL_left](./assets/RL_8f5610a77c3257f9.png)
+
+![RL_right](./assets/RL_a71fec9cd7b65cf0.png)
 
 # IL、RL Training Cache 与 Metric Cache 说明
 
