@@ -1,4 +1,4 @@
-# 七篇强化学习文章的方法与范式对比分析
+# 十篇强化学习文章的方法与范式对比分析
 
 > 分析时间：2026-07-23
 
@@ -12,8 +12,11 @@
 | **DiffusionQL** | 2023 | 通用离线RL | Q-learning + 扩散策略 | **纯RL**（离线） |
 | **DPPO** | 2024 | 机器人控制 | PPO + 扩散去噪MDP | IL + RL |
 | **DiffusionDriveV2** | 2025 | 端到端自动驾驶 | GRPO + 锚点截断扩散 | IL + RL |
+| **Flow-GRPO** | 2026 | 端到端自动驾驶 | GRPO + Flow策略优化 | IL + RL |
+| **PlannerRFT** | 2026 | 端到端规划/自动驾驶 | RFT后训练（相对优势优化） | IL + RL |
 | **DriveDPO** | 2025 | 端到端自动驾驶 | DPO + 锚点分类策略 | IL + RL |
 | **DIPOLE** | 2026 | 通用RL + 自动驾驶 | 二分扩散策略优化 | IL + RL |
+| **DiffusionNFT** | 2026 | 通用RL + 生成策略优化 | 加权回归式扩散微调 | IL + RL |
 | **HDP** | 2026 | 端到端自动驾驶(实车) | KL正则化加权回归 | IL + RL |
 
 ---
@@ -24,7 +27,7 @@
 
 ### 2.1 在线RL：CarPlanner — Model-based PPO
 
-CarPlanner 是6篇中唯一采用**经典在线RL**路线的工作——不需要任何IL预训练，RL从零开始训练。
+CarPlanner 是10篇中唯一采用**经典在线RL**路线的工作——不需要任何IL预训练，RL从零开始训练。
 
 #### 核心设计
 
@@ -89,20 +92,24 @@ $$L(\theta) = \underbrace{\mathbb{E}_{t, \epsilon, s, a}\left[||\epsilon - \epsi
 
 ## 三、IL + RL（IL预训练 → RL微调/后训练）
 
-该类别的方法采用**两阶段训练范式**：第一阶段用IL（行为克隆/模仿学习）获得强大的行为先验，第二阶段用RL针对性优化。根据RL阶段的优化方式，分为**三个子类**：策略梯度微调（梯度通过扩散链/离散策略logit）、偏好对齐微调（DPO）和加权回归微调（梯度不通过扩散链）。
+该类别的方法采用**两阶段训练范式**：第一阶段用IL（行为克隆/模仿学习）获得强大的行为先验，第二阶段用RL针对性优化。根据RL阶段的优化方式，分为**三个子类**：策略梯度微调（梯度通过扩散链/Flow轨迹）、偏好对齐微调（DPO）和加权回归微调（梯度不通过扩散链）。
 
-### 3.1 策略梯度微调：DPPO 与 DiffusionDriveV2
+### 3.1 策略梯度微调：DPPO、DiffusionDriveV2、Flow-GRPO 与 PlannerRFT
 
-DPPO 和 DiffusionDriveV2 同属策略梯度路线，核心共性是将**扩散去噪过程视为MDP**，在其上做策略梯度更新。**DiffusionDriveV2 在方法论上继承自 DPPO**：保留"去噪MDP + 策略梯度"的框架，但在策略参数化、优势估计和探索方式上做了三处关键改进，使其更适合大规模驾驶任务。
+DPPO、DiffusionDriveV2、Flow-GRPO 和 PlannerRFT 同属策略梯度路线，核心共性是将**生成轨迹过程视为MDP**，在其上做策略梯度更新。**DiffusionDriveV2 在方法论上继承自 DPPO**：保留"去噪MDP + 策略梯度"的框架，但在策略参数化、优势估计和探索方式上做了三处关键改进，使其更适合大规模驾驶任务。**Flow-GRPO** 则与 DiffusionDriveV2 同类，延续了 GRPO 式相对优势优化思路。**PlannerRFT** 在训练范式上也更接近这一类：先有监督预训练，再基于轨迹相对优劣做RL后训练优化。
 
 #### 共同基础：去噪MDP + 策略梯度
 
-两篇工作共享同一个核心思想——将扩散模型的迭代去噪过程展开为MDP：
+DPPO 与 DiffusionDriveV2 共享同一个核心思想——将扩散模型的迭代去噪过程展开为MDP：
 
 - **外层**：环境MDP，$a$ 是干净动作
 - **内层**（扩散去噪MDP）：$(a_k, a_{k-1}, p_\theta, s)$，从噪声 $a_K$ 逐步去噪到 $a_0$
 - 每个去噪步骤 $p_\theta(a_{k-1}|a_k, s)$ 是Gaussian，有可计算log-likelihood
 - 在去噪链上做策略梯度更新（PG/PPO/GRPO），梯度流经整个或部分去噪链
+
+Flow-GRPO 与该路线同属策略梯度家族，在范式层面与 DiffusionDriveV2 一致（GRPO相对优势优化），但可采用Flow策略参数化。
+
+PlannerRFT 也更接近该子类：其RFT阶段本质上是基于采样轨迹反馈的策略改进，而非DPO式成对偏好分类，也非KL闭式解下的纯重加权回归。
 
 ---
 
@@ -186,9 +193,9 @@ DPPO（2024，机器人）
 
 ---
 
-### 3.2 加权回归微调：DIPOLE 与 HDP
+### 3.2 加权回归微调：DIPOLE、DiffusionNFT 与 HDP
 
-DIPOLE 和 HDP 共享完全相同的数学基础——**KL正则化RL的闭式解**，将策略优化转化为加权扩散损失。两者的差异在于**权重函数设计、模型结构和应用侧重**。
+DIPOLE、DiffusionNFT 和 HDP 共享同一类数学基础——**KL正则化RL的闭式解**，将策略优化转化为加权扩散损失。三者差异主要体现在**权重函数设计、模型结构和应用侧重**。
 
 #### 共同数学基础：KL正则化RL → 加权回归
 
@@ -285,7 +292,7 @@ DIPOLE的二分策略理论上可以应用到HDP的框架中（替换exp权重�
 
 ### 3.3 偏好对齐微调：DriveDPO — DPO + 离散锚点策略
 
-DriveDPO 与前五篇IL+RL方法的关键不同在于：**策略不是扩散模型，而是离散分类分布**（softmax over anchor vocabulary）；**RL方法不是PG也不是加权回归，而是DPO（Direct Preference Optimization）**。
+DriveDPO 与前六篇IL+RL方法的关键不同在于：**策略不是扩散模型，而是离散分类分布**（softmax over anchor vocabulary）；**RL方法不是PG也不是加权回归，而是DPO（Direct Preference Optimization）**。
 
 #### 策略形式：离散锚点分类
 
@@ -333,7 +340,7 @@ $$\pi_\theta(a_i) = \text{Softmax}(\text{MLP}(\text{CrossAttn}(a_i, \text{Scene}
 
 #### 与其他IL+RL方法的本质区别
 
-| 维度 | 策略梯度类（DPPO/DDV2） | 加权回归类（DIPOLE/HDP） | 偏好对齐类（DriveDPO） |
+| 维度 | 策略梯度类（DPPO/DDV2/Flow-GRPO/PlannerRFT） | 加权回归类（DIPOLE/DiffusionNFT/HDP） | 偏好对齐类（DriveDPO） |
 |------|------------------------|--------------------------|------------------------|
 | **RL范式** | 策略梯度（PG/PPO/GRPO） | KL正则化RL → 加权回归 | DPO偏好对齐 |
 | **策略类型** | 扩散模型（连续生成） | 扩散/Flow模型（连续生成） | **离散分类**（N选1） |
@@ -363,12 +370,12 @@ $$\pi_\theta(a_i) = \text{Softmax}(\text{MLP}(\text{CrossAttn}(a_i, \text{Scene}
 | 稳定性 | 训练曲线波动大 | IL提供稳定起点，RL微调幅度可控 |
 | 探索难度 | 需从零探索动作空间 | 在IL先验附近局部探索 |
 | 是否可能超越人类 | 理论上可以（奖励引导） | RL阶段可能超越IL先验 |
-| 代表工作 | CarPlanner, DiffusionQL | DPPO, DiffusionDriveV2, DIPOLE, HDP |
+| 代表工作 | CarPlanner, DiffusionQL | DPPO, DiffusionDriveV2, Flow-GRPO, PlannerRFT, DriveDPO, DIPOLE, DiffusionNFT, HDP |
 | 适合场景 | 无高质量演示数据、仿真环境 | 有大量真实/仿真驾驶数据、需高效部署 |
 
 ### 4.2 IL+RL内部三个子类对比
 
-| 维度 | 策略梯度微调（DPPO、DDV2） | 偏好对齐微调（DriveDPO） | 加权回归微调（DIPOLE、HDP） |
+| 维度 | 策略梯度微调（DPPO、DDV2、Flow-GRPO、PlannerRFT） | 偏好对齐微调（DriveDPO） | 加权回归微调（DIPOLE、DiffusionNFT、HDP） |
 |------|---------------------------|--------------------------|------------------------------|
 | **核心思想** | 去噪/决策过程即MDP → PG | 偏好对比较 → DPO对齐 | KL正则化RL闭式解 → 加权回归 |
 | **策略类型** | 扩散模型（连续生成） | **离散分类**（锚点N选1） | 扩散/Flow模型（连续生成） |
@@ -379,7 +386,7 @@ $$\pi_\theta(a_i) = \text{Softmax}(\text{MLP}(\text{CrossAttn}(a_i, \text{Scene}
 | **训练稳定性** | PPO clip / Intra-Anchor隔离 | KL正则化 + 参考策略冻结 | Sigmoid有界 / Hybrid Loss一致性 |
 | **主要局限** | 扩散链长，计算重 | 锚点离散化限制多样性 | 依赖参考策略质量 |
 
-> 各子类内部详细差异见：[3.1节](#31-策略梯度微调dppo-与-diffusiondrivev2)（DPPO vs DDV2）、[3.2节](#32-加权回归微调dipole-与-hdp)（DIPOLE vs HDP）、[3.3节](#33-偏好对齐微调drivedpo--dpo--离散锚点策略)（DriveDPO）。
+> 各子类内部详细差异见第3.1节（DPPO/DDV2/Flow-GRPO/PlannerRFT）、第3.2节（DIPOLE/DiffusionNFT/HDP）与第3.3节（DriveDPO）。
 
 ---
 
@@ -396,25 +403,28 @@ IL + RL（两阶段：IL预训练 → RL微调）
 ├── 策略梯度微调（梯度通过扩散链）
 │   ├── 共同基础：去噪MDP + 策略梯度（DDV2继承自DPPO）
 │   ├── DPPO — 标准扩散 + PPO + GAE（通用框架，需价值网络）
-│   └── DiffusionDriveV2 — 锚点截断扩散 + GRPO（搜索空间↓，无价值网络）
+│   ├── DiffusionDriveV2 — 锚点截断扩散 + GRPO（搜索空间↓，无价值网络）
+│   └── Flow-GRPO — Flow策略 + GRPO（与DiffusionDriveV2同类）
+│   └── PlannerRFT — 规划器RFT后训练（与Flow-GRPO/DDV2同类）
 ├── 偏好对齐微调（梯度通过离散logit）
 │   └── DriveDPO — 离散锚点分类 + Safety DPO（无需标量奖励，仅需偏好对）
 └── 加权回归微调（梯度不通过扩散链）
     ├── 共同基础：KL正则化RL闭式解 → 对扩散损失按价值加权
-    ├── DIPOLE — 二分策略（双模型 + Sigmoid权重 + CFG式推理控制）
-    └── HDP   — 单一策略（单模型 + Exp权重 + Hybrid Loss一致性 + 数据规模化 + 实车）
+   ├── DIPOLE — 二分策略（双模型 + Sigmoid权重 + CFG式推理控制）
+   ├── DiffusionNFT — 加权回归式扩散微调（与DIPOLE同类）
+   └── HDP   — 单一策略（单模型 + Exp权重 + Hybrid Loss一致性 + 数据规模化 + 实车）
 ```
 
 ### 5.2 关键教训
 
-1. **IL+RL两阶段已成为实际部署标准**：7篇中5篇采用此范式，纯RL在大规模驾驶任务中训练效率仍是瓶颈
+1. **IL+RL两阶段已成为实际部署标准**：10篇中8篇采用此范式，纯RL在大规模驾驶任务中训练效率仍是瓶颈
 
 2. **三种RL微调路线各有适用场景**：
-   - 策略梯度（DPPO/DDV2）：理论完备，适合在线交互环境
+   - 策略梯度（DPPO/DDV2/Flow-GRPO/PlannerRFT）：理论完备，适合在线交互环境
    - 偏好对齐（DriveDPO）：无需标量奖励，适合安全偏好明确的场景
-   - 加权回归（DIPOLE/HDP）：计算最高效，适合大规模实际部署
+   - 加权回归（DIPOLE/DiffusionNFT/HDP）：计算最高效，适合大规模实际部署
 
-3. **加权回归路线的实用优势突出**：不需要通过扩散链回传梯度，计算开销与IL几乎相同（DIPOLE、HDP）
+3. **加权回归路线的实用优势突出**：不需要通过扩散链回传梯度，计算开销与IL几乎相同（DIPOLE、DiffusionNFT、HDP）
 
 4. **数据规模化可能比算法创新更关键**：HDP的核心发现——70M帧使多模态从无到有涌现，远超出常用基准数据集量级
 
@@ -426,4 +436,3 @@ IL + RL（两阶段：IL预训练 → RL微调）
 
 8. **从仿真到真实的鸿沟**：开环好 ≠ 闭环好（HDP的hybrid loss是关键桥梁），仿真好 ≠ 真实好（仅HDP做真实道路验证）
 
-6. **从仿真到真实的鸿沟**：开环好 ≠ 闭环好（HDP的hybrid loss是关键桥梁），仿真好 ≠ 真实好（仅HDP做真实道路验证）
